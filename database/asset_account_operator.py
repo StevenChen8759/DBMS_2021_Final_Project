@@ -3,66 +3,83 @@ from datetime import datetime
 from loguru import logger
 from sqlalchemy.exc import SQLAlchemyError
 
-from database.schema import UserInfo
+from database.schema import AssetAccount
 
 str_to_list = lambda x: x.replace(" ", "").split(",")
 
-def user_info_make_list(self):
+def make_list(self):
+
+    # Get AAID List
+    aaid_text = self.lineEdit_asset_aaid.text()
+    if aaid_text != "":
+        aaid_list = str_to_list(aaid_text)
+    else:
+        aaid_list = []
+
     # Get UID List
-    uid_text = self.lineEdit_userinfo_uid.text()
+    uid_text = self.lineEdit_asset_uid.text()
     if uid_text != "":
         uid_list = str_to_list(uid_text)
     else:
         uid_list = []
 
     # Get Name List
-    name_text = self.lineEdit_userinfo_name.text()
+    name_text = self.lineEdit_asset_name.text()
     if name_text != "":
         name_list = str_to_list(name_text)
     else:
         name_list = []
 
     # Get Gender List
-    gender_text = self.lineEdit_userinfo_gender.text()
-    if gender_text != "":
-        gender_list = str_to_list(gender_text)
+    type_text = self.lineEdit_asset_type.text()
+    if type_text != "":
+        type_list = str_to_list(type_text)
     else:
-        gender_list = []
+        type_list = []
 
     # Get Birthday List
-    birthday_text = self.lineEdit_userinfo_birthday.text()
-    if birthday_text != "":
-        birthday_list = str_to_list(birthday_text)
+    currency_text = self.lineEdit_asset_currency.text()
+    if currency_text != "":
+        currency_list = str_to_list(currency_text)
     else:
-        birthday_list = []
+        currency_list = []
 
-    return uid_list, name_list, gender_list, birthday_list
+    return aaid_list, uid_list, name_list, type_list, currency_list
 
-# Operation for user information
-def user_info_select(
+def select(
     session,
+    aaid_list,
     uid_list,
     name_list,
-    gender_list,
-    birthday_list
+    type_list,
+    currency_list,
 ):
-
     # Edit filter - Add query constriant (WHERE PART)
     filter_list = []
 
+    if aaid_list != []:
+        filter_list.append(
+            AssetAccount.aaid.in_(aaid_list)
+        )
+
     if uid_list != []:
         filter_list.append(
-            UserInfo.uid.in_(uid_list)
+            AssetAccount.uid.in_(uid_list)
         )
 
     if name_list != []:
         filter_list.append(
-            UserInfo.name.in_(name_list)
+            AssetAccount.name.in_(name_list)
         )
 
-    if gender_list != []:
+    if type_list != []:
         filter_list.append(
-            UserInfo.gender.in_(gender_list)
+            AssetAccount.aatype.in_(type_list)
+        )
+
+    if currency_list != []:
+        filter_list.append(
+            AssetAccount.currency.in_(currency_list)
         )
 
     # Convert filter to tuple type
@@ -70,7 +87,7 @@ def user_info_select(
 
     # Prepare Query Statement and print out
     try:
-        qstat = session.query(UserInfo).filter(*filter_tuple).order_by("uid")
+        qstat = session.query(AssetAccount).filter(*filter_tuple).order_by("uid", "aaid")
         logger.debug(f"Equivalent SQL: {qstat}")
     except SQLAlchemyError as e:
         error_msg = f"<{type(e).__name__}> {str(e)}"
@@ -84,31 +101,33 @@ def user_info_select(
         error_msg = f"<{type(e).__name__}> {str(e)}"
         return error_msg, None
 
-def user_info_insert(
+def insert(
     session,
+    aaid_list,
     uid_list,
     name_list,
-    gender_list,
-    birthday_list
+    type_list,
+    currency_list,
 ):
     # Check length of data to insert
-    if len(uid_list) != 1 or len(name_list) != 1 or len(gender_list) != 1 or len(birthday_list) != 1:
+    if len(aaid_list) != 1 or len(uid_list) != 1 or len(name_list) != 1 or len(type_list) != 1 or len(currency_list) != 1:
         logger.warning("Error: All insert data attribute should be equel to 1")
         return "Error: at least one insert data attribute should be equel to 1", True
 
     try:
-        user_info = UserInfo(
+        asset_account = AssetAccount(
+            aaid = aaid_list[0],
             uid = uid_list[0],
             name = name_list[0],
-            gender = gender_list[0],
-            birthdate = datetime.fromisoformat(birthday_list[0])
+            aatype = type_list[0],
+            currency = currency_list[0]
         )
     except ValueError as e:
         error_msg = f"<{type(e).__name__}> {str(e)}"
         return error_msg, True
 
     try:
-        session.add(user_info)
+        session.add(asset_account)
     except SQLAlchemyError as e:
         error_msg = f"<{type(e).__name__}> {str(e)}"
         return error_msg, True
@@ -120,49 +139,48 @@ def user_info_insert(
         error_msg = f"<{type(e).__name__}> {str(e)}"
         return error_msg, True
 
-
-def user_info_update(
+def update(
     session,
+    aaid_list,
     uid_list,
     name_list,
-    gender_list,
-    birthday_list
+    type_list,
+    currency_list,
 ):
     # Check length of data to update
-    if len(uid_list) != 1:
+    if len(aaid_list) != 1:
         logger.warning("Error: UID count must be 1")
         return "Error: UID count must be 1", True
 
-    if len(name_list) == 0 and len(gender_list) == 0 and len(birthday_list) == 0:
+    if len(name_list) == 0 and len(type_list) == 0 and len(currency_list) == 0:
         logger.warning("Error: at least insert data attribute should be equel to 1")
         return "Error: at least insert data attribute should be equel to 1", True
 
-    if len(name_list) > 1 or len(gender_list) > 1 or len(birthday_list) > 1:
+    if len(name_list) > 1 or len(type_list) > 1 or len(currency_list) > 1:
         logger.warning("Error: Length of insert data attribute should be less than or equel to 1")
         return "Error: Length of all insert data attribute should be be less than or equal to 1", True
 
     try:
         update_map = {}
 
-        user_id = uid_list[0]
+        asset_account_id = aaid_list[0]
 
         if len(name_list) > 0:
             update_map["name"] = name_list[0]
 
-        if len(gender_list) > 0:
-            update_map["gender"] = gender_list[0]
+        if len(type_list) > 0:
+            update_map["aatype"] = type_list[0]
 
-        if len(birthday_list) > 0:
-            update_map["birthdate"] = datetime.fromisoformat(birthday_list[0])
-
+        if len(currency_list) > 0:
+            update_map["currency"] = currency_list[0]
     except ValueError as e:
         error_msg = f"<{type(e).__name__}> {str(e)}"
         return error_msg, True
 
     try:
         update_query = (
-            session.query(UserInfo)
-                   .filter(UserInfo.uid == user_id)
+            session.query(AssetAccount)
+                   .filter(AssetAccount.aaid == asset_account_id)
                    .update(update_map)
         )
     except SQLAlchemyError as e:

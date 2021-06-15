@@ -6,10 +6,14 @@ from PyQt5.QtGui import QColor
 from PyQt5.QtCore import QAbstractTableModel, Qt, QVariant
 from PyQt5.QtWidgets import QApplication, QMainWindow
 from loguru import logger
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 from database import (
     psql_session,
     user_info_operator,
+    asset_account_operator,
+    stt_operator,
     schema,
 )
 
@@ -213,12 +217,14 @@ class StockDBMS_GUI(QMainWindow):
         uid_list, name_list, gender_list, birthday_list = user_info_operator.user_info_make_list(self)
         logger.debug(f"Parameter Length -> UID: {len(uid_list)}, Name: {len(name_list)}, Gender: {len(gender_list)}, Birthday: {len(birthday_list)}")
 
+        print(birthday_list)
+
         qresp, is_error = user_info_operator.user_info_insert(
             self.psql_session,
             uid_list,
             name_list,
             gender_list,
-            birthday_list,
+            birthday_list
         )
 
         self.output_session_response(qresp, is_error)
@@ -232,7 +238,7 @@ class StockDBMS_GUI(QMainWindow):
         uid_list, name_list, gender_list, birthday_list = user_info_operator.user_info_make_list(self)
         logger.debug(f"Parameter Length -> UID: {len(uid_list)}, Name: {len(name_list)}, Gender: {len(gender_list)}, Birthday: {len(birthday_list)}")
 
-        qresp, is_error = user_info_operator.user_info_insert(
+        qresp, is_error = user_info_operator.user_info_update(
             self.psql_session,
             uid_list,
             name_list,
@@ -248,13 +254,82 @@ class StockDBMS_GUI(QMainWindow):
 # Asset Account Button
 
     def __asset_select(self):
-        logger.info("Select Asset Account Information")
+        # Open Session
+        self.openSession()
+
+        # Make Asset Account Information
+        aaid_list, uid_list, name_list, type_list, currency_list = asset_account_operator.make_list(self)
+        logger.debug(f"Parameter Length -> AAID: {len(aaid_list)}, UID: {len(uid_list)}, Name: {len(name_list)}, Type: {len(type_list)}, Currency: {len(currency_list)}")
+
+        qresp, result = asset_account_operator.select(
+            self.psql_session,
+            aaid_list,
+            uid_list,
+            name_list,
+            type_list,
+            currency_list,
+        )
+
+        # Check Query Result
+        if result is not None:
+
+            # Success, Make list for table view
+            data_schema = ["UID", "AAID", "Name", "Type", "currency"]
+            data_list = [
+                [raw.uid,
+                 raw.aaid,
+                 raw.name,
+                 raw.aatype,
+                 raw.currency
+                 ] for raw in result
+            ]
+
+            # Output Final Result
+            self.output_query_result(data_schema, data_list)
+            self.output_session_response(qresp, False)
+
+        else:
+            self.output_session_response(f"Query Failed: {qresp}", True)
+
+        self.closeSession()
 
     def __asset_insert(self):
-        logger.info("Insert Asset Account Information")
+        self.openSession()
+
+        aaid_list, uid_list, name_list, type_list, currency_list = asset_account_operator.make_list(self)
+        logger.debug(f"Parameter Length -> AAID: {len(aaid_list)}, UID: {len(uid_list)}, Name: {len(name_list)}, Type: {len(type_list)}, Currency: {len(currency_list)}")
+
+        qresp, is_error = asset_account_operator.insert(
+            self.psql_session,
+            aaid_list,
+            uid_list,
+            name_list,
+            type_list,
+            currency_list,
+        )
+
+        self.output_session_response(qresp, is_error)
+
+        self.closeSession()
 
     def __asset_update(self):
-        logger.info("Update Asset Account Information")
+        self.openSession()
+
+        aaid_list, uid_list, name_list, type_list, currency_list = asset_account_operator.make_list(self)
+        logger.debug(f"Parameter Length -> AAID: {len(aaid_list)}, UID: {len(uid_list)}, Name: {len(name_list)}, Type: {len(type_list)}, Currency: {len(currency_list)}")
+
+        qresp, is_error = asset_account_operator.update(
+            self.psql_session,
+            aaid_list,
+            uid_list,
+            name_list,
+            type_list,
+            currency_list,
+        )
+
+        self.output_session_response(qresp, is_error)
+
+        self.closeSession()
 
     def __asset_general_account_balance_eval(self):
         logger.info("General Account Balance Evaluation")
@@ -266,10 +341,42 @@ class StockDBMS_GUI(QMainWindow):
 # Stock Trading Type
 
     def __stt_trading_type_select(self):
-        logger.info("Select Trading Type Information")
+        # Open Session
+        self.openSession()
+
+        # Make Stock Trading Type Information
+        qresp, result = stt_operator.select(
+            self.psql_session
+        )
+
+        # Check Query Result
+        if result is not None:
+
+            # Success, Make list for table view
+            data_schema = ["STTID", "TaxInfoID", "Type Name", "Fee Rate", "Min Fee", "Tax Type", "Tax Rate"]
+            data_list = [
+                [raw.sttid,
+                 raw.taxinfoid,
+                 raw.type_name,
+                 raw.fee_rate,
+                 raw.fee_min,
+                 raw.tax_type,
+                 raw.rate,
+                 ] for raw in result
+            ]
+
+            # Output Final Result
+            self.output_query_result(data_schema, data_list)
+            self.output_session_response(qresp, False)
+
+        else:
+            self.output_session_response(f"Query Failed: {qresp}", True)
+
+        self.closeSession()
 
     def __stt_trading_type_update(self):
-        logger.info("Update Trading Type Information")
+        sttid_list, description_list, feerate_list, feemin_list = stt_operator.make_list(self)
+        logger.debug(f"Parameter Length -> STTID: {len(sttid_list)}, Description: {len(description_list)}, FeeRate: {len(feerate_list)}, FeeMin: {len(feemin_list)}")
 
     def __stt_tax_info_update(self):
         logger.info("Update Tax Information")
@@ -341,7 +448,42 @@ class StockDBMS_GUI(QMainWindow):
 # Directly SQL Query Input
 
     def __run_input_sql_query(self):
-        logger.info("Run Directly Input SQL Query")
+        query = self.lineEdit_directSQLquery.text()
+        logger.info(f"Run Directly Input SQL Query: {query}")
+
+        if query == "":
+            self.output_session_response("No SQL Query input", True)
+
+        self.openSession()
+
+        session = self.psql_session
+
+        try:
+            result = session.execute(text(query))
+            session.commit()
+        except SQLAlchemyError as e:
+            error_msg = f"<{type(e).__name__}> {str(e)}"
+            return error_msg, None
+
+        table_col_name = []
+        table_raw_data = []
+        try:
+            for raw in result:
+                table_raw_data.append(
+                    [element for element in raw]
+                )
+
+            if len(table_raw_data) > 0:
+                table_col_name = [f"raw{i}" for i in range(len(table_raw_data[0]))]
+            else:
+                table_col_name = ["No Data"]
+        except Exception as e:
+            table_col_name = ["No Data"]
+
+        self.output_query_result(table_col_name, table_raw_data)
+        self.output_session_response("OK", False)
+
+        self.closeSession()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
