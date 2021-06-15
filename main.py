@@ -2,13 +2,12 @@ import sys
 from typing import List
 
 from PyQt5 import QtCore, uic
+from PyQt5.QtGui import QColor
 from PyQt5.QtCore import QAbstractTableModel, Qt, QVariant
 from PyQt5.QtWidgets import QApplication, QMainWindow
 from loguru import logger
 
 from database import psql_session, operator, schema
-
-str_to_list = lambda x: x.replace(" ", "").split(",")
 
 class QueryResultTable(QAbstractTableModel):
 
@@ -59,11 +58,6 @@ class StockDBMS_GUI(QMainWindow):
         logger.info("Load GUI")
         uic.loadUi('accounting.ui', self) # Load the .ui file
 
-        # Connect PostgreSQL Session
-        logger.info("Connect to PostgreSQL session on the server")
-        self.psql_session = psql_session.connect()
-        logger.success("PostgreSQL session is connected now...")
-
         # Add Button Callback - User Information
         self.pushButton_userinfo_select.clicked.connect(self.__userinfo_select)
         self.pushButton_userinfo_insert.clicked.connect(self.__userinfo_insert)
@@ -111,8 +105,8 @@ class StockDBMS_GUI(QMainWindow):
         # Add default data list
         self.output_data_model = QueryResultTable(
             self,
-            ["Data Output"],
-            [["Show Output Raw Data"], "Show Output Raw Data"]
+            ["Class", "Name", "Student ID"],
+            [["AI學程碩一", "陳順祥", "NE6091051"]]
         )
 
         # Set Data Output List Default Value
@@ -128,6 +122,35 @@ class StockDBMS_GUI(QMainWindow):
         logger.info("Close GUI")
         QMainWindow.closeEvent(self, event)
 
+
+    def output_query_result(self, data_schema, data_raw):
+        self.output_data_model.update_data(self, data_schema, data_raw)
+
+    def output_session_response(self, resp_text, is_error):
+        if is_error:
+            self.textBrowser.setTextColor(
+                QColor("white")
+            )
+            self.textBrowser.setTextBackgroundColor(
+                QColor("red")
+            )
+        else:
+            self.textBrowser.setTextColor(
+                QColor("black")
+            )
+            self.textBrowser.setTextBackgroundColor(
+                QColor("lime")
+            )
+        self.textBrowser.reload()
+        self.textBrowser.setText(resp_text)
+
+    def openSession(self):
+        # Connect PostgreSQL Session
+        logger.info("Connect to PostgreSQL session on the server")
+        self.psql_session = psql_session.connect()
+        logger.success("PostgreSQL session is connected now...")
+
+    def closeSession(self):
         # StockDBMS_GUI QMainWindow Close Event
         logger.info("Disconnect PostgreSQL Session")
         psql_session.disconnect(self.psql_session)
@@ -137,48 +160,25 @@ class StockDBMS_GUI(QMainWindow):
 # User Information Button
 
     def __userinfo_select(self):
-        logger.info("Select User Information")
+        # Open Session
+        self.openSession()
 
-        # Get UID List
-        uid_text = self.lineEdit_userinfo_uid.text()
-        if uid_text != "":
-            uid_list = str_to_list(uid_text)
-        else:
-            uid_list = []
-
-        # Get Name List
-        name_text = self.lineEdit_userinfo_name.text()
-        if name_text != "":
-            name_list = str_to_list(name_text)
-        else:
-            name_list = []
-
-        # Get Gender List
-        gender_text = self.lineEdit_userinfo_gender.text()
-        if gender_text != "":
-            gender_list = str_to_list(gender_text)
-        else:
-            gender_list = []
-
-        # Get Birthday List
-        birthday_text = self.lineEdit_userinfo_birthday.text()
-        if birthday_text != "":
-            birthday_list = str_to_list(birthday_text)
-        else:
-            birthday_list = []
-
+        # Make User Information
+        uid_list, name_list, gender_list, birthday_list = operator.user_info_make_list(self)
         logger.debug(f"Parameter Length -> UID: {len(uid_list)}, Name: {len(name_list)}, Gender: {len(gender_list)}, Birthday: {len(birthday_list)}")
 
-        qresp, result = operator.user_info_query(
+        qresp, result = operator.user_info_select(
             self.psql_session,
             uid_list,
             name_list,
             gender_list,
             birthday_list,
         )
-        if result is not None:
-            logger.success(f"Query Success, result length: {len(result)}")
 
+        # Check Query Result
+        if result is not None:
+
+            # Success, Make list for table view
             data_schema = ["uid", "name", "gender", "birthdate", "joindate"]
             data_list = [
                 [raw.uid,
@@ -189,17 +189,51 @@ class StockDBMS_GUI(QMainWindow):
                  ] for raw in result
             ]
 
-            self.output_data_model.update_data(self, data_schema, data_list)
+            # Output Final Result
+            self.output_query_result(data_schema, data_list)
+            self.output_session_response(qresp, False)
 
         else:
-            logger.error(f"Query Failed, Message: {qresp}")
+            self.output_session_response(f"Query Failed: {qresp}", True)
+
+        self.closeSession()
 
     def __userinfo_insert(self):
-        logger.info("Insert User Information")
-        print(self.lineEdit_userinfo_uid.text())
+        self.openSession()
+
+        uid_list, name_list, gender_list, birthday_list = operator.user_info_make_list(self)
+        logger.debug(f"Parameter Length -> UID: {len(uid_list)}, Name: {len(name_list)}, Gender: {len(gender_list)}, Birthday: {len(birthday_list)}")
+
+        qresp, is_error = operator.user_info_insert(
+            self.psql_session,
+            uid_list,
+            name_list,
+            gender_list,
+            birthday_list,
+        )
+
+        self.output_session_response(qresp, is_error)
+
+        self.closeSession()
+
 
     def __userinfo_update(self):
-        logger.info("Update User Information")
+        self.openSession()
+
+        uid_list, name_list, gender_list, birthday_list = operator.user_info_make_list(self)
+        logger.debug(f"Parameter Length -> UID: {len(uid_list)}, Name: {len(name_list)}, Gender: {len(gender_list)}, Birthday: {len(birthday_list)}")
+
+        qresp, is_error = operator.user_info_insert(
+            self.psql_session,
+            uid_list,
+            name_list,
+            gender_list,
+            birthday_list,
+        )
+
+        self.output_session_response(qresp, is_error)
+
+        self.closeSession()
 
 #--------------------------------------------------------------------------------------------------
 # Asset Account Button
