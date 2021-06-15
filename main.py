@@ -7,7 +7,11 @@ from PyQt5.QtCore import QAbstractTableModel, Qt, QVariant
 from PyQt5.QtWidgets import QApplication, QMainWindow
 from loguru import logger
 
-from database import psql_session, operator, schema
+from database import (
+    psql_session,
+    user_info_operator,
+    schema,
+)
 
 class QueryResultTable(QAbstractTableModel):
 
@@ -117,6 +121,7 @@ class StockDBMS_GUI(QMainWindow):
         self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowMaximizeButtonHint)
         self.show() # Show the GUI
 
+
     def closeEvent(self, event):
         # Bypass Class QMainWindow Close Event
         logger.info("Close GUI")
@@ -125,6 +130,7 @@ class StockDBMS_GUI(QMainWindow):
 
     def output_query_result(self, data_schema, data_raw):
         self.output_data_model.update_data(self, data_schema, data_raw)
+
 
     def output_session_response(self, resp_text, is_error):
         if is_error:
@@ -144,11 +150,13 @@ class StockDBMS_GUI(QMainWindow):
         self.textBrowser.reload()
         self.textBrowser.setText(resp_text)
 
+
     def openSession(self):
         # Connect PostgreSQL Session
         logger.info("Connect to PostgreSQL session on the server")
         self.psql_session = psql_session.connect()
         logger.success("PostgreSQL session is connected now...")
+
 
     def closeSession(self):
         # StockDBMS_GUI QMainWindow Close Event
@@ -164,10 +172,10 @@ class StockDBMS_GUI(QMainWindow):
         self.openSession()
 
         # Make User Information
-        uid_list, name_list, gender_list, birthday_list = operator.user_info_make_list(self)
+        uid_list, name_list, gender_list, birthday_list = user_info_operator.user_info_make_list(self)
         logger.debug(f"Parameter Length -> UID: {len(uid_list)}, Name: {len(name_list)}, Gender: {len(gender_list)}, Birthday: {len(birthday_list)}")
 
-        qresp, result = operator.user_info_select(
+        qresp, result = user_info_operator.user_info_select(
             self.psql_session,
             uid_list,
             name_list,
@@ -198,13 +206,14 @@ class StockDBMS_GUI(QMainWindow):
 
         self.closeSession()
 
+
     def __userinfo_insert(self):
         self.openSession()
 
-        uid_list, name_list, gender_list, birthday_list = operator.user_info_make_list(self)
+        uid_list, name_list, gender_list, birthday_list = user_info_operator.user_info_make_list(self)
         logger.debug(f"Parameter Length -> UID: {len(uid_list)}, Name: {len(name_list)}, Gender: {len(gender_list)}, Birthday: {len(birthday_list)}")
 
-        qresp, is_error = operator.user_info_insert(
+        qresp, is_error = user_info_operator.user_info_insert(
             self.psql_session,
             uid_list,
             name_list,
@@ -220,10 +229,10 @@ class StockDBMS_GUI(QMainWindow):
     def __userinfo_update(self):
         self.openSession()
 
-        uid_list, name_list, gender_list, birthday_list = operator.user_info_make_list(self)
+        uid_list, name_list, gender_list, birthday_list = user_info_operator.user_info_make_list(self)
         logger.debug(f"Parameter Length -> UID: {len(uid_list)}, Name: {len(name_list)}, Gender: {len(gender_list)}, Birthday: {len(birthday_list)}")
 
-        qresp, is_error = operator.user_info_insert(
+        qresp, is_error = user_info_operator.user_info_insert(
             self.psql_session,
             uid_list,
             name_list,
